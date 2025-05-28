@@ -181,7 +181,9 @@ public class Interactive(IChatClient chat) : IHostedService
 
     static readonly ChatOptions chatOptions = new()
     {
-        ModelId = "claude-sonnet-4-20250514"
+        ModelId = "claude-sonnet-4-20250514",
+        MaxOutputTokens = 10000,
+        Temperature = 0.7f,
     };
 
     readonly CancellationTokenSource cts = new();
@@ -189,7 +191,6 @@ public class Interactive(IChatClient chat) : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        AnsiConsole.MarkupLine($":robot: Ready");
         _ = Task.Run(ListenAsync, CancellationToken.None);
         return Task.CompletedTask;
     }
@@ -203,9 +204,12 @@ public class Interactive(IChatClient chat) : IHostedService
 
     async Task ListenAsync()
     {
+        var json = AnsiConsole.Confirm("Do you want to view a JSON render of the responses from the AI?");
+
+        AnsiConsole.MarkupLine($":robot: Ready");
+        AnsiConsole.Markup($":person_beard: ");
         while (!cts.IsCancellationRequested)
         {
-            AnsiConsole.Markup($":person_beard: ");
             var input = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(input))
             {
@@ -228,8 +232,14 @@ public class Interactive(IChatClient chat) : IHostedService
                 }
 
                 AnsiConsole.WriteLine();
-                AnsiConsole.Write(new JsonText(JsonSerializer.Serialize(response, jsonOptions)));
-                AnsiConsole.WriteLine();
+
+                if (json)
+                {
+                    AnsiConsole.Write(new Panel(new JsonText(JsonSerializer.Serialize(response, jsonOptions))));
+                    AnsiConsole.WriteLine();
+                }
+
+                AnsiConsole.Markup($":person_beard: ");
             }
         }
     }
