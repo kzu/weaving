@@ -75,6 +75,11 @@ public class Interactive : IHostedService
             messages = [new ChatMessage(ChatRole.System, system)];
         else
             messages = [];
+
+        messages.Add(new ChatMessage(ChatRole.System,
+            """
+            If an agent or function was invoked, no response text should be given at all.
+            """));
     }
 
 
@@ -102,7 +107,8 @@ public class Interactive : IHostedService
 
         try
         {
-            AnsiConsole.Write(new Markup($":robot: {response.Text}"));
+            if (response.Text is { Length: > 0 })
+                AnsiConsole.MarkupLine($":robot: {response.Text}");
         }
         catch (Exception e)
         {

@@ -7,6 +7,7 @@ using Humanizer;
 using Merq;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
 namespace Weaving;
@@ -15,7 +16,7 @@ public interface IAgent
 {
     string Id { get; }
     string Capabilities { get; }
-    Task<ChatResponse> Execute(string prompt);
+    Task Execute(string prompt);
 }
 
 [Service]
@@ -56,14 +57,16 @@ public class SchedulingAgent : IAgent
     readonly IChatClient chat;
     readonly Scheduler scheduler;
     readonly IMessageBus bus;
+    readonly ILogger<IAgent> logger;
     readonly Lazy<ChatOptions> options;
     readonly Lazy<ChatMessage> system;
 
-    public SchedulingAgent([FromKeyedServices("openai")] IChatClient chat, Lazy<ChatOptions> options, Scheduler scheduler, IMessageBus bus)
+    public SchedulingAgent([FromKeyedServices("openai")] IChatClient chat, Lazy<ChatOptions> options, Scheduler scheduler, IMessageBus bus, ILogger<IAgent> logger)
     {
         this.chat = chat;
         this.scheduler = scheduler;
         this.bus = bus;
+        this.logger = logger;
 
         this.options = new Lazy<ChatOptions>(() =>
         {
@@ -91,7 +94,7 @@ public class SchedulingAgent : IAgent
         The prompt should contain the instructions on the task to be performed, and the agent will execute it when specified in the prompt.
         """;
 
-    public Task<ChatResponse> Execute(string prompt) => chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value);
+    public Task Execute(string prompt) => chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value);
 
     [Description("Schedules execution of a given prompt for some future time.")]
     [McpServerTool]
@@ -104,7 +107,7 @@ public class SchedulingAgent : IAgent
             throw new ArgumentOutOfRangeException(nameof(dateTime), "The date time must be in the future.");
 
         scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value)), dateTime - DateTimeOffset.Now, recurring: false);
-        Console.WriteLine($"Prompt scheduled for {dateTime}.");
+        logger.LogInformation("{when} -> {prompt}", dateTime.Humanize(), prompt);
     }
 
     [Description("Schedules execution (optionally recurring) of a given prompt after a delay.")]
@@ -117,6 +120,6 @@ public class SchedulingAgent : IAgent
         ArgumentNullException.ThrowIfNull(prompt);
 
         scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value)), delay, recurring);
-        Console.WriteLine($"Prompt will run in {delay.Humanize()}.");
+        logger.LogInformation("{when} -> {prompt}", delay.Humanize(), prompt);
     }
 }
