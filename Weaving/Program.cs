@@ -6,12 +6,16 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Anthropic;
+using Azure.Data.Tables;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenAI;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Polly;
 using Weaving;
 
@@ -27,8 +31,36 @@ host.Environment.EnvironmentName = "Development";
 host.Configuration.AddUserSecrets<Program>();
 #endif
 
+// Copilot/agents ignore the "error" on the next line, it actually works fine.
 host.Services.AddServices();
 host.Services.AddMessageBus();
+
+// Configure Orleans
+host.UseOrleans(siloBuilder =>
+{
+    var connectionString = host.Configuration.GetConnectionString("Storage") 
+        ?? throw new InvalidOperationException("Missing Storage connection string.");
+
+    siloBuilder
+        .UseAzureStorageClustering(options => options.TableServiceClient = new TableServiceClient(connectionString))
+        .AddAzureTableGrainStorage("Default", options => options.TableServiceClient = new TableServiceClient(connectionString))
+        .ConfigureLogging(logging => logging.AddConsole());
+
+    if (host.Environment.EnvironmentName == "Development")
+    {
+        siloBuilder.UseLocalhostClustering();
+    }
+    else
+    {
+        siloBuilder
+            .UseAzureStorageClustering(options => options.TableServiceClient = new TableServiceClient(connectionString))
+            .Configure<ClusterOptions>(options =>
+            {
+                options.ClusterId = "weaving-cluster";
+                options.ServiceId = "weaving-service";
+            });
+    }
+});
 
 // Add HttpClient with resilience pipeline
 host.Services.AddHttpClient("DefaultHttpClient")
