@@ -1,5 +1,6 @@
 ﻿using System;
 using Anthropic;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,9 +15,8 @@ host.Configuration.AddUserSecrets<Program>();
 host.Services.AddServices();
 
 host.Services.AddChatClient(new AnthropicClient(host.Configuration["Claude:Key"]
-    ?? throw new InvalidOperationException("Missing Claude:Key configuration.")));
-
-//host.Services.AddLogging(config => config.AddConsole());
+    ?? throw new InvalidOperationException("Missing Claude:Key configuration.")))
+    .UseFunctionInvocation();
 
 var app = host.Build();
 
