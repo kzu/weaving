@@ -1,0 +1,6 @@
+[file "Weaving/Extensions/AddLazyExtension.cs"]
+	url = https://github.com/devlooped/catbag/blob/main/Microsoft/Extensions/DependencyInjection/AddLazyExtension.cs
+	sha = 427c210c0a0684464119f9a1730165b76c5bcfdb
+
+	etag = 6e447022a649e02d411f0b7048848da2d7210c5a21c8058ee3f2de74dbf04ac0
+	weak
