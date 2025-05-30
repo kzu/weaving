@@ -4,3 +4,15 @@
 
 	etag = 6e447022a649e02d411f0b7048848da2d7210c5a21c8058ee3f2de74dbf04ac0
 	weak
+[file "NuGet.config"]
+	url = https://github.com/dotnet/extensions/tree/main/NuGet.config
+	sha = 496cc2fb2172ec9a9765b028fa519f566ac07883
+
+	etag = 7ed6f7c3b86c9fae53b83dd082c9e7e3bf3b8c7a11641c701cc532c6ae839be1
+	weak
+[file "global.json"]
+	url = https://github.com/dotnet/extensions/tree/main/global.json
+	sha = 496cc2fb2172ec9a9765b028fa519f566ac07883
+
+	etag = ad6500201322e35a4d60bce646c7149bb523690b22e1308c425068fbf85c4b57
+	weak
