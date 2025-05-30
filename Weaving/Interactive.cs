@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +40,7 @@ public class Interactive : IHostedService
         chatOptions.Temperature = 0.7f;
         chatOptions.Tools ??= [];
         chatOptions.Tools.Add(AIFunctionFactory.Create(ClearOutput));
+        chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
 
         InitializeHistory();
 
@@ -103,7 +103,7 @@ public class Interactive : IHostedService
 
     void AddResponse(ChatResponse response)
     {
-        messages.AddRange(response.Messages.Where(x => x.Contents.All(y => y is TextContent)));
+        messages.AddRange(response.Messages);
 
         try
         {
