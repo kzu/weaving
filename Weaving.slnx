@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="extensions/src/Libraries/Microsoft.Extensions.AI.OpenAI/Microsoft.Extensions.AI.OpenAI.csproj" />
   <Project Path="extensions/src/Libraries/Microsoft.Extensions.AI/Microsoft.Extensions.AI.csproj" />
+  <Project Path="mcp/src/ModelContextProtocol.AspNetCore/ModelContextProtocol.AspNetCore.csproj" />
+  <Project Path="mcp/src/ModelContextProtocol/ModelContextProtocol.csproj" />
   <Project Path="Weaving/Weaving.csproj" />
   <Project Path="extensions/src/Libraries/Microsoft.Extensions.AI.Abstractions/Microsoft.Extensions.AI.Abstractions.csproj" />
 </Solution>
