@@ -16,3 +16,9 @@
 
 	etag = ad6500201322e35a4d60bce646c7149bb523690b22e1308c425068fbf85c4b57
 	weak
+[file "Weaving/Extensions/Throw.cs"]
+	url = https://github.com/devlooped/catbag/blob/main/System/Throw.cs
+	sha = 48aeee281f63caabffeae14d7d84a6ece89e7907
+
+	etag = 1b3819a90c19d9de27b8c40e539934549aadd79ed1925cda8e8af6061eba3608
+	weak

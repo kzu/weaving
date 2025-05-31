@@ -85,7 +85,10 @@ host.Services.AddSingleton(services =>
     var agents = services.GetServices<IAgent>();
     var options = new ChatOptions
     {
-        Tools = []
+        Tools =
+        [
+           AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."),
+        ]
     };
     foreach (var agent in agents)
     {
