@@ -93,11 +93,13 @@ host.Services.AddScoped(serviceProvider =>
 host.Services.AddChatClient(services => new AnthropicClient(
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
     services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
+    .UseSystemPrompt()
     .UseFunctionInvocation();
 
 host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
     .GetChatClient("gpt-4o").AsIChatClient())
+    .UseSystemPrompt()
     .UseFunctionInvocation();
 
 host.Services.AddSingleton(services =>

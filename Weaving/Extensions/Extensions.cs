@@ -12,15 +12,6 @@ static class Extensions
         public ChatMessage AsChat(ChatRole? role = default) => new(role ?? ChatRole.User, prompt);
     }
 
-    extension(ChatOptions options)
-    {
-        public string? SystemPrompt
-        {
-            get => (options.AdditionalProperties ??= []).TryGetValue("SystemPrompt", out var value) ? value as string : null;
-            set => (options.AdditionalProperties ??= [])["SystemPrompt"] = value;
-        }
-    }
-
     extension<T>(IList<T> list)
     {
         public void AddRange(IEnumerable<T> items)
