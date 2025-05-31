@@ -102,7 +102,7 @@ public static class ConversationStorage
         return builder.Use((innerClient, services) =>
         {
             storage ??= services.GetRequiredService<CloudStorageAccount>();
-            loggerFactory ??= services.GetService<ILoggerFactory>();
+            loggerFactory ??= services.GetRequiredService<ILoggerFactory>();
 
             var chatClient = new ConversationChatClient(innerClient, storage, loggerFactory.CreateLogger<ConversationChatClient>());
             configure?.Invoke(chatClient);

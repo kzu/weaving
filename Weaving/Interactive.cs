@@ -10,7 +10,6 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spectre.Console;
-using Spectre.Console.Json;
 
 namespace Weaving;
 
@@ -29,7 +28,6 @@ public class Interactive : IHostedService
     readonly IChatClient chat;
     readonly ChatOptions chatOptions;
     readonly CloudStorageAccount storage;
-    bool showJson;
 
     public Interactive(IChatClient chat, ChatOptions options, IMessageBus bus, CloudStorageAccount storage)
     {
@@ -52,8 +50,6 @@ public class Interactive : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        showJson = AnsiConsole.Confirm("Do you want to view a JSON render of the responses from the AI?");
-
         if (AnsiConsole.Confirm("Do you want to resume the last conversation?"))
         {
             await foreach (var entry in TablePartition.Create(storage, "Weaving", "Conversations").EnumerateAsync())
@@ -120,13 +116,6 @@ public class Interactive : IHostedService
         }
 
         AnsiConsole.WriteLine();
-
-        if (showJson)
-        {
-            AnsiConsole.Write(new Panel(new JsonText(JsonSerializer.Serialize(response, jsonOptions))));
-            AnsiConsole.WriteLine();
-        }
-
         AnsiConsole.Markup($":person_beard: ");
     }
 }

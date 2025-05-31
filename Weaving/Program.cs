@@ -14,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using Polly;
+using Spectre.Console;
 using Weaving;
 
 var host = Host.CreateApplicationBuilder(args);
@@ -64,21 +65,28 @@ host.Services.AddScoped(serviceProvider =>
     return httpClientFactory.CreateClient("DefaultHttpClient");
 });
 
-host.Services.AddChatClient(services => new AnthropicClient(
+var logging = AnsiConsole.Confirm("Do you want to view detailed logs from the AI?");
+
+var builder = host.Services.AddChatClient(services => new AnthropicClient(
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
     services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
     .UseConversationStorage()
     .UseSystemPrompt()
-    .UseLogging()
+    .UseMemory()
     .UseFunctionInvocation();
 
-host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
+if (logging)
+    builder.UseLogging().UseConsoleLogging();
+
+builder = host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
     .GetChatClient("gpt-4o").AsIChatClient())
     .UseConversationStorage()
     .UseSystemPrompt()
-    .UseLogging()
     .UseFunctionInvocation();
+
+if (logging)
+    builder.UseLogging().UseConsoleLogging();
 
 host.Services.AddSingleton(services =>
 {
@@ -105,5 +113,8 @@ if (Debugger.IsAttached)
     host.Logging.AddFilter("Weaving", LogLevel.Information);
 
 var app = host.Build();
+
+var user = AnsiConsole.Ask("Enter your name", Environment.UserName);
+app.Services.GetRequiredService<ChatOptions>().EndUserId = user;
 
 await app.RunAsync();
