@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Devlooped;
 using Merq;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,12 +28,14 @@ public class Interactive : IHostedService
     readonly IMessageBus bus;
     readonly IChatClient chat;
     readonly ChatOptions chatOptions;
+    readonly CloudStorageAccount storage;
     bool showJson;
 
-    public Interactive(IChatClient chat, ChatOptions options, IMessageBus bus)
+    public Interactive(IChatClient chat, ChatOptions options, IMessageBus bus, CloudStorageAccount storage)
     {
         this.bus = bus;
         this.chat = chat;
+        this.storage = storage;
         chatOptions = options.Clone();
         chatOptions.ModelId = "claude-sonnet-4-20250514";
         chatOptions.MaxOutputTokens = 10000;
@@ -47,11 +50,20 @@ public class Interactive : IHostedService
         bus.Observe<ChatResponse>().Subscribe(AddResponse);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         showJson = AnsiConsole.Confirm("Do you want to view a JSON render of the responses from the AI?");
+
+        if (AnsiConsole.Confirm("Do you want to resume the last conversation?"))
+        {
+            await foreach (var entry in TablePartition.Create(storage, "Weaving", "Conversations").EnumerateAsync())
+            {
+                chatOptions.ConversationId = entry.RowKey;
+                break;
+            }
+        }
+
         _ = Task.Run(ListenAsync, cts.Token);
-        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
