@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Threading;
@@ -27,7 +26,6 @@ public class Interactive : IHostedService
     readonly IMessageBus bus;
     readonly IChatClient chat;
     readonly ChatOptions chatOptions;
-    List<ChatMessage> messages = [];
     bool showJson;
 
     public Interactive(IChatClient chat, ChatOptions options, IMessageBus bus)
@@ -41,8 +39,6 @@ public class Interactive : IHostedService
         chatOptions.Tools ??= [];
         chatOptions.Tools.Add(AIFunctionFactory.Create(ClearOutput));
         chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
-
-        InitializeHistory();
 
         bus.Observe<ChatResponse>().Subscribe(AddResponse);
     }
@@ -65,23 +61,9 @@ public class Interactive : IHostedService
     void ClearOutput()
     {
         AnsiConsole.Clear();
-        InitializeHistory();
+        chatOptions.ConversationId = null;
         AnsiConsole.MarkupLine($":robot: Cleared :broom:");
     }
-
-    void InitializeHistory()
-    {
-        if (chatOptions.SystemPrompt is { } system)
-            messages = [new ChatMessage(ChatRole.System, system)];
-        else
-            messages = [];
-
-        messages.Add(new ChatMessage(ChatRole.System,
-            """
-            If an agent or function was invoked, no response text should be given at all.
-            """));
-    }
-
 
     async Task ListenAsync()
     {
@@ -92,19 +74,23 @@ public class Interactive : IHostedService
             var input = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(input))
             {
-                var response = await AnsiConsole.Status().StartAsync(":robot: Thinking...",
-                    ctx => chat.GetResponseAsync([.. messages, input.AsChat()], chatOptions, cts.Token));
+                try
+                {
+                    var response = await AnsiConsole.Status().StartAsync(":robot: Thinking...",
+                        ctx => chat.GetResponseAsync(input, chatOptions, cts.Token));
 
-                messages.Add(new ChatMessage(ChatRole.Assistant, $"User said '{input}'"));
-                AddResponse(response);
+                    AddResponse(response);
+                }
+                catch (Exception e)
+                {
+                    AnsiConsole.WriteException(e);
+                }
             }
         }
     }
 
     void AddResponse(ChatResponse response)
     {
-        messages.AddRange(response.Messages);
-
         try
         {
             if (response.Text is { Length: > 0 })

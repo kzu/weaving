@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Anthropic;
-using Azure.Data.Tables;
+using Devlooped;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +31,10 @@ host.Configuration.AddUserSecrets<Program>();
 // Copilot/agents ignore the "error" on the next line, it actually works fine.
 host.Services.AddServices();
 host.Services.AddMessageBus();
+
+host.Services.AddSingleton(CloudStorageAccount.Parse(
+    host.Configuration.GetConnectionString("Storage")
+    ?? throw new InvalidOperationException("Missing Storage connection string.")));
 
 // Add HttpClient with resilience pipeline
 host.Services.AddHttpClient("DefaultHttpClient")
@@ -63,13 +67,17 @@ host.Services.AddScoped(serviceProvider =>
 host.Services.AddChatClient(services => new AnthropicClient(
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
     services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
+    .UseConversationStorage()
     .UseSystemPrompt()
+    .UseLogging()
     .UseFunctionInvocation();
 
 host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
     .GetChatClient("gpt-4o").AsIChatClient())
+    .UseConversationStorage()
     .UseSystemPrompt()
+    .UseLogging()
     .UseFunctionInvocation();
 
 host.Services.AddSingleton(services =>
