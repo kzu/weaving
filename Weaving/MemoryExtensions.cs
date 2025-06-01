@@ -64,15 +64,15 @@ public static partial class MemoryExtensions
                 var tools = options.Tools;
                 if (!options.Tools.Any(x => x.Name == "read_graph"))
                 {
-                    tools.Add(AIFunctionFactory.Create(ReadGraph, "read_graph", "Returns the entire knowledge graph for the current user, including all entities and relations."));
-                    tools.Add(AIFunctionFactory.Create(SearchNodes, "search_nodes", "Searches for nodes (entities) in the knowledge graph whose names match the given query string."));
-                    tools.Add(AIFunctionFactory.Create(CreateEntities, "create_entities", "Adds new entities to the knowledge graph. If an entity with the same name already exists, it will be updated."));
-                    tools.Add(AIFunctionFactory.Create(CreateRelations, "create_relations", "Adds new relations between entities in the knowledge graph. If a relation already exists, it will be updated."));
-                    tools.Add(AIFunctionFactory.Create(AddObservations, "add_observations", "Adds new observations to existing entities in the knowledge graph."));
-                    tools.Add(AIFunctionFactory.Create(DeleteEntities, "delete_entities", "Deletes entities from the knowledge graph by name. All relations and observations associated with the entity will also be deleted."));
-                    tools.Add(AIFunctionFactory.Create(DeleteObservations, "delete_observations", "Deletes specific observations from entities in the knowledge graph."));
-                    tools.Add(AIFunctionFactory.Create(DeleteRelations, "delete_relations", "Deletes relations between entities in the knowledge graph."));
-                    tools.Add(AIFunctionFactory.Create(OpenNodes, "open_nodes", "Returns the subgraph containing the specified nodes and their direct relations."));
+                    tools.Add(AIFunctionFactory.Create(ReadGraph, "read_graph"));
+                    tools.Add(AIFunctionFactory.Create(SearchNodes, "search_nodes"));
+                    tools.Add(AIFunctionFactory.Create(CreateEntities, "create_entities"));
+                    tools.Add(AIFunctionFactory.Create(CreateRelations, "create_relations"));
+                    tools.Add(AIFunctionFactory.Create(AddObservations, "add_observations"));
+                    tools.Add(AIFunctionFactory.Create(DeleteEntities, "delete_entities"));
+                    tools.Add(AIFunctionFactory.Create(DeleteObservations, "delete_observations"));
+                    tools.Add(AIFunctionFactory.Create(DeleteRelations, "delete_relations"));
+                    tools.Add(AIFunctionFactory.Create(OpenNodes, "open_nodes"));
                 }
             }
         }
@@ -96,6 +96,7 @@ public static partial class MemoryExtensions
             JsonSerializer.Serialize(stream, graph, JsonContext.Default.KnowledgeGraph);
         }
 
+        [Description("Returns the entire knowledge graph for the current user, including all entities and relations.")]
         KnowledgeGraph ReadGraph()
         {
             if (CurrentUserId is null)
@@ -104,6 +105,7 @@ public static partial class MemoryExtensions
             return graph;
         }
 
+        [Description("Searches for nodes (entities) in the knowledge graph whose names match the given query string.")]
         KnowledgeGraph SearchNodes(string query)
         {
             if (CurrentUserId is null)
@@ -119,6 +121,7 @@ public static partial class MemoryExtensions
             return new KnowledgeGraph(entities, relations);
         }
 
+        [Description("Adds new entities to the knowledge graph. If an entity with the same name already exists, it will be updated.")]
         void CreateEntities(Entity[] entities)
         {
             if (CurrentUserId is null)
@@ -141,6 +144,7 @@ public static partial class MemoryExtensions
             SaveGraph(CurrentUserId, new KnowledgeGraph(entityDict.Values.ToArray(), graph.Relations));
         }
 
+        [Description("Adds new relations between entities in the knowledge graph. If a relation already exists, it will be updated.")]
         void CreateRelations(Relation[] relations)
         {
             if (CurrentUserId is null)
@@ -161,6 +165,7 @@ public static partial class MemoryExtensions
             SaveGraph(CurrentUserId, new KnowledgeGraph(graph.Entities, newRelations.ToArray()));
         }
 
+        [Description("Adds new observations to existing entities in the knowledge graph.")]
         void AddObservations(Observation[] observations)
         {
             if (CurrentUserId is null)
@@ -178,6 +183,7 @@ public static partial class MemoryExtensions
             SaveGraph(CurrentUserId, new KnowledgeGraph(entityDict.Values.ToArray(), graph.Relations));
         }
 
+        [Description("Deletes entities from the knowledge graph by name. All relations and observations associated with the entity will also be deleted.")]
         void DeleteEntities(string[] entities)
         {
             if (CurrentUserId is null)
@@ -189,6 +195,7 @@ public static partial class MemoryExtensions
             SaveGraph(CurrentUserId, new KnowledgeGraph(newEntities, newRelations));
         }
 
+        [Description("Deletes specific observations from entities in the knowledge graph.")]
         void DeleteObservations(Observation[] observations)
         {
             if (CurrentUserId is null)
@@ -206,6 +213,7 @@ public static partial class MemoryExtensions
             SaveGraph(CurrentUserId, new KnowledgeGraph(entityDict.Values.ToArray(), graph.Relations));
         }
 
+        [Description("Deletes relations between entities in the knowledge graph.")]
         void DeleteRelations(Relation[] relations)
         {
             if (CurrentUserId is null)
@@ -216,6 +224,7 @@ public static partial class MemoryExtensions
             SaveGraph(CurrentUserId, new KnowledgeGraph(graph.Entities, newRelations));
         }
 
+        [Description("Returns the subgraph containing the specified nodes and their direct relations.")]
         KnowledgeGraph OpenNodes(string[] names)
         {
             if (CurrentUserId is null)
