@@ -23,25 +23,25 @@ public static class ConsoleLoggingExtensions
     {
         public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            AnsiConsole.Write(new JsonText(new
+            AnsiConsole.Write(new Panel(new JsonText(new
             {
                 messages = messages.Where(x => x.Role != ChatRole.System).ToArray(),
                 options
-            }.ToJsonString()));
+            }.ToJsonString())));
 
             var response = await InnerClient.GetResponseAsync(messages, options, cancellationToken);
 
-            AnsiConsole.Write(new JsonText(response.ToJsonString()));
+            AnsiConsole.Write(new Panel(new JsonText(response.ToJsonString())));
             return response;
         }
 
         public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            AnsiConsole.Write(new JsonText(new
+            AnsiConsole.Write(new Panel(new JsonText(new
             {
                 messages = messages.Where(x => x.Role != ChatRole.System).ToArray(),
                 options
-            }.ToJsonString()));
+            }.ToJsonString())));
 
             List<ChatResponseUpdate> updates = [];
 
@@ -51,7 +51,7 @@ public static class ConsoleLoggingExtensions
                 yield return update;
             }
 
-            AnsiConsole.Write(new JsonText(updates.ToJsonString()));
+            AnsiConsole.Write(new Panel(new JsonText(updates.ToJsonString())));
         }
     }
 }

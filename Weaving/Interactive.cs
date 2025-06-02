@@ -1,7 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Devlooped;
@@ -16,12 +15,6 @@ namespace Weaving;
 [Service]
 public class Interactive : IHostedService
 {
-    static readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     readonly CancellationTokenSource cts = new();
 
     readonly IMessageBus bus;
@@ -29,13 +22,13 @@ public class Interactive : IHostedService
     readonly ChatOptions chatOptions;
     readonly CloudStorageAccount storage;
 
-    public Interactive(IChatClient chat, ChatOptions options, IMessageBus bus, CloudStorageAccount storage)
+    public Interactive([FromKeyedServices("openai")] IChatClient chat, ChatOptions options, IMessageBus bus, CloudStorageAccount storage)
     {
         this.bus = bus;
         this.chat = chat;
         this.storage = storage;
         chatOptions = options.Clone();
-        chatOptions.ModelId = "claude-sonnet-4-20250514";
+        //chatOptions.ModelId = "claude-sonnet-4-20250514";
         chatOptions.MaxOutputTokens = 10000;
         chatOptions.Temperature = 0.7f;
         chatOptions.Tools ??= [];
@@ -107,6 +100,7 @@ public class Interactive : IHostedService
         {
             if (response.Text is { Length: > 0 })
                 AnsiConsole.MarkupLine($":robot: {response.Text}");
+
         }
         catch (Exception e)
         {

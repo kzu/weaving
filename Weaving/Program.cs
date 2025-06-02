@@ -55,7 +55,8 @@ host.Services.AddHttpClient("DefaultHttpClient")
                 (int)response.StatusCode == 529 => PredicateResult.True(),
             _ => PredicateResult.False()
         };
-        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
+        options.TotalRequestTimeout.Timeout = Debugger.IsAttached ?
+            TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(30);
     });
 
 // Register HttpClient for DI
@@ -80,9 +81,10 @@ if (logging)
 
 builder = host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
-    .GetChatClient("gpt-4o").AsIChatClient())
+    .GetChatClient("gpt-4.1").AsIChatClient())
     .UseConversationStorage()
     .UseSystemPrompt()
+    .UseMemory()
     .UseFunctionInvocation();
 
 if (logging)

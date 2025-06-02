@@ -1,8 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Data.Tables;
 using Devlooped;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,8 +16,10 @@ namespace Weaving;
 
 public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount storage, ILogger<ConversationChatClient> logger) : DelegatingChatClient(innerClient)
 {
-    IDocumentPartition<ChatConversation> repo = DocumentPartition.Create<ChatConversation>(
+    IDocumentPartition<ChatConversation> history = DocumentPartition.Create<ChatConversation>(
         storage, "Weaving", "Conversations", x => x.Id);
+
+    ITableRepository<TableEntity> topics = TableRepository.Create(storage, "Topics");
 
     public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -24,11 +30,13 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
             conversationId = Ulid.NewUlid().ToString();
             (options ??= new()).ConversationId = conversationId;
             logger.LogInformation("Creating new conversation with ID {ConversationId}.", conversationId);
-            conversation = new ChatConversation(conversationId, [.. messages]);
+            conversation = new ChatConversation(conversationId, [
+                new ChatMessage(ChatRole.System, $"Conversation ID is {conversationId}"),
+                .. messages]);
         }
         else
         {
-            if (await repo.GetAsync(conversationId, cancellationToken) is { } existing)
+            if (await history.GetAsync(conversationId, cancellationToken) is { } existing)
             {
                 logger.LogInformation("Found existing conversation with ID {ConversationId}.", conversationId);
                 conversation = existing;
@@ -37,15 +45,17 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
             else
             {
                 logger.LogInformation("Creating new conversation with ID {ConversationId}.", conversationId);
-                conversation = new ChatConversation(conversationId, [.. messages]);
+                conversation = new ChatConversation(conversationId, [
+                    new ChatMessage(ChatRole.System, $"Conversation ID is {conversationId}"),
+                .. messages]);
             }
         }
 
-        var response = await base.GetResponseAsync(conversation.Messages, options, cancellationToken);
+        var response = await base.GetResponseAsync(conversation.Messages, SetupTools(options), cancellationToken);
         conversation.Messages.AddRange(response.Messages);
         response.ConversationId = conversation.Id;
 
-        await repo.PutAsync(conversation, cancellationToken);
+        await history.PutAsync(conversation, cancellationToken);
         return response;
     }
 
@@ -61,7 +71,7 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
         }
         else
         {
-            if (await repo.GetAsync(conversationId, cancellationToken) is { } existing)
+            if (await history.GetAsync(conversationId, cancellationToken) is { } existing)
             {
                 conversation = existing;
                 conversation.Messages.AddRange(messages);
@@ -74,7 +84,7 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
 
         List<ChatResponseUpdate> updates = [];
 
-        await foreach (var update in base.GetStreamingResponseAsync(conversation.Messages, options, cancellationToken))
+        await foreach (var update in base.GetStreamingResponseAsync(conversation.Messages, SetupTools(options), cancellationToken))
         {
             updates.Add(update);
             update.ConversationId = conversationId;
@@ -83,10 +93,75 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
 
         var response = updates.ToChatResponse();
         conversation.Messages.AddRange(response.Messages);
-        await repo.PutAsync(conversation, cancellationToken);
+        await history.PutAsync(conversation, cancellationToken);
     }
 
     record ChatConversation(string Id, List<ChatMessage> Messages);
+
+    ChatOptions SetupTools(ChatOptions? options)
+    {
+        options ??= new ChatOptions();
+        options.Tools ??= [];
+        if (!options.Tools.Any(x => x.Name == "conversation_read_history"))
+        {
+            options.Tools.Add(AIFunctionFactory.Create(ReadHistory, "conversation_read_history"));
+            options.Tools.Add(AIFunctionFactory.Create(AddTopics, "conversation_add_topics"));
+            options.Tools.Add(AIFunctionFactory.Create(ReadTopics, "conversation_read_topic"));
+            options.Tools.Add(AIFunctionFactory.Create(FindConversations, "conversation_find_by_topics"));
+        }
+
+        return options;
+    }
+
+    [Description("Reads the existing chat messages that ocurred in the given conversation.")]
+    async Task<IEnumerable<ChatMessage>> ReadHistory(string conversationId)
+    {
+        if (await history.GetAsync(conversationId) is { } conversation)
+            return conversation.Messages;
+
+        return [];
+    }
+
+    [Description("Adds topics to the given conversation")]
+    async Task AddTopics(string conversationId, string[] topics)
+    {
+        if (topics is null || topics.Length == 0)
+            return;
+
+        await this.topics.PutAsync(topics.Select(x => new TableEntity(conversationId,
+            TableStorageAttribute.Sanitize(x.ToUpperInvariant()))));
+    }
+
+    [Description("Reads the topics associated with the given conversation.")]
+    async IAsyncEnumerable<string> ReadTopics(string conversationId)
+    {
+        await foreach (var topic in topics.EnumerateAsync(conversationId))
+        {
+            yield return topic.RowKey;
+        }
+    }
+
+    [Description("Finds conversation identifiers that match the given topics (case-insensitive). The full conversations can then be read with those identifiers using the conversation_read_history.")]
+    async Task<string[]> FindConversations(string[] topics)
+    {
+        var table = storage.CreateTableServiceClient().GetTableClient("Topics");
+        var conversations = new HashSet<string>();
+        // Query all entities once, then filter in memory for each topic (case-insensitive)
+        if (topics is null || topics.Length == 0)
+            return [];
+
+        topics = topics.Select(x => TableStorageAttribute.Sanitize(x.ToUpperInvariant())).ToArray();
+        await foreach (var entity in this.topics.EnumerateAsync())
+        {
+            foreach (var topic in topics)
+            {
+                if (entity.RowKey.ToUpperInvariant().Contains(topic))
+                    conversations.Add(entity.PartitionKey);
+            }
+        }
+
+        return conversations.ToArray();
+    }
 }
 
 public static class ConversationStorage

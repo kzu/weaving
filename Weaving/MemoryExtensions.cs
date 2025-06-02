@@ -62,17 +62,17 @@ public static partial class MemoryExtensions
             {
                 options.Tools ??= [];
                 var tools = options.Tools;
-                if (!options.Tools.Any(x => x.Name == "read_graph"))
+                if (!options.Tools.Any(x => x.Name == "memory_read_graph"))
                 {
-                    tools.Add(AIFunctionFactory.Create(ReadGraph, "read_graph"));
-                    tools.Add(AIFunctionFactory.Create(SearchNodes, "search_nodes"));
-                    tools.Add(AIFunctionFactory.Create(CreateEntities, "create_entities"));
-                    tools.Add(AIFunctionFactory.Create(CreateRelations, "create_relations"));
-                    tools.Add(AIFunctionFactory.Create(AddObservations, "add_observations"));
-                    tools.Add(AIFunctionFactory.Create(DeleteEntities, "delete_entities"));
-                    tools.Add(AIFunctionFactory.Create(DeleteObservations, "delete_observations"));
-                    tools.Add(AIFunctionFactory.Create(DeleteRelations, "delete_relations"));
-                    tools.Add(AIFunctionFactory.Create(OpenNodes, "open_nodes"));
+                    tools.Add(AIFunctionFactory.Create(ReadGraph, "memory_read_graph"));
+                    tools.Add(AIFunctionFactory.Create(SearchNodes, "memory_search_nodes"));
+                    tools.Add(AIFunctionFactory.Create(CreateEntities, "memory_create_entities"));
+                    tools.Add(AIFunctionFactory.Create(CreateRelations, "memory_create_relations"));
+                    tools.Add(AIFunctionFactory.Create(AddObservations, "memory_add_observations"));
+                    tools.Add(AIFunctionFactory.Create(DeleteEntities, "memory_delete_entities"));
+                    tools.Add(AIFunctionFactory.Create(DeleteObservations, "memory_delete_observations"));
+                    tools.Add(AIFunctionFactory.Create(DeleteRelations, "memory_delete_relations"));
+                    tools.Add(AIFunctionFactory.Create(OpenNodes, "memory_open_nodes"));
                 }
             }
         }
