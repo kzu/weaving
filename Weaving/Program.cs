@@ -68,12 +68,12 @@ host.Services.AddScoped(serviceProvider =>
 
 var logging = AnsiConsole.Confirm("Do you want to view detailed logs from the AI?");
 
-var builder = host.Services.AddChatClient(services => new AnthropicClient(
+var builder = host.Services.AddKeyedChatClient("claude", services => new AnthropicClient(
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
     services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
     .UseConversationStorage()
-    .UseSystemPrompt()
     .UseMemory()
+    .UseSystemPrompt()
     .UseFunctionInvocation();
 
 if (logging)
@@ -83,8 +83,8 @@ builder = host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Confi
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
     .GetChatClient("gpt-4.1").AsIChatClient())
     .UseConversationStorage()
-    .UseSystemPrompt()
     .UseMemory()
+    .UseSystemPrompt()
     .UseFunctionInvocation();
 
 if (logging)
@@ -105,7 +105,7 @@ host.Services.AddSingleton(services =>
         // Configures individual agent execution
         options.Tools.Add(AIFunctionFactory.Create(agent.Execute, agent.Id, agent.Capabilities));
     }
-    options.SystemPrompt = Constants.SystemPrompt;
+    options.AddSystemPrompt(Constants.SystemPrompt);
     return options;
 });
 
@@ -115,8 +115,5 @@ if (Debugger.IsAttached)
     host.Logging.AddFilter("Weaving", LogLevel.Information);
 
 var app = host.Build();
-
-var user = AnsiConsole.Ask("Enter your name", Environment.UserName);
-app.Services.GetRequiredService<ChatOptions>().EndUserId = user;
 
 await app.RunAsync();

@@ -59,7 +59,6 @@ public class SchedulingAgent : IAgent
     readonly IMessageBus bus;
     readonly ILogger<IAgent> logger;
     readonly Lazy<ChatOptions> options;
-    readonly Lazy<ChatMessage> system;
 
     public SchedulingAgent([FromKeyedServices("openai")] IChatClient chat, Lazy<ChatOptions> options, Scheduler scheduler, IMessageBus bus, ILogger<IAgent> logger)
     {
@@ -81,9 +80,6 @@ public class SchedulingAgent : IAgent
 
             return cloned;
         });
-
-        system = new Lazy<ChatMessage>(() => new ChatMessage(ChatRole.System, options.Value.SystemPrompt ??
-            "You are a scheduling agent that can execute tasks at specified times."));
     }
 
     public string Id => "scheduling_agent";
@@ -94,7 +90,7 @@ public class SchedulingAgent : IAgent
         The prompt should contain the instructions on the task to be performed, and the agent will execute it when specified in the prompt.
         """;
 
-    public Task Execute(string prompt) => chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value);
+    public Task Execute(string prompt) => chat.GetResponseAsync(prompt, options.Value);
 
     [Description("Schedules execution of a given prompt for some future time.")]
     [McpServerTool]
@@ -106,7 +102,7 @@ public class SchedulingAgent : IAgent
         if (dateTime < DateTimeOffset.Now)
             throw new ArgumentOutOfRangeException(nameof(dateTime), "The date time must be in the future.");
 
-        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value)), dateTime - DateTimeOffset.Now, recurring: false);
+        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync(prompt, options.Value)), dateTime - DateTimeOffset.Now, recurring: false);
         logger.LogInformation("{when} -> {prompt}", dateTime.Humanize(), prompt);
     }
 
@@ -119,7 +115,7 @@ public class SchedulingAgent : IAgent
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
-        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync([system.Value, prompt.AsChat()], options.Value)), delay, recurring);
+        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync(prompt, options.Value)), delay, recurring);
         logger.LogInformation("{when} -> {prompt}", delay.Humanize(), prompt);
     }
 }

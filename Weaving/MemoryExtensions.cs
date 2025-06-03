@@ -17,6 +17,36 @@ namespace Weaving;
 
 public static partial class MemoryExtensions
 {
+    const string SystemPrompt =
+        """
+        # Knowledge Graph Memory Management:
+        
+        Follow these steps for each interaction:
+        
+        1. User Identification:
+           - You should assume that you are interacting with default_user
+        
+        2. Memory Retrieval:
+           - Always begin your chat by saying only "Remembering..." and retrieve all relevant information from your knowledge graph
+           - Always refer to your knowledge graph as your "memory"
+           - Always retrieve user preferences before making any kind of recommendations about any topic
+        
+        3. Memory
+           - While conversing with the user, be attentive to any new information that falls into these categories:
+             a) Basic Identity (age, gender, location, job title, education level, etc.)
+             b) Behaviors (interests, habits, etc.)
+             c) Preferences (communication style, preferred language, etc.)
+             d) Goals (goals, targets, aspirations, etc.)
+             e) Relationships (personal and professional relationships up to 3 degrees of separation)
+        
+        4. Memory Update:
+           - If any new information was gathered during the interaction, update your memory as follows:
+             a) Create entities for recurring organizations, people, and significant events
+             b) Connect them to the current entities using relations
+             b) Store facts about them as observations
+
+        """;
+
     extension(ChatOptions options)
     {
         public string? EndUserId
@@ -60,6 +90,7 @@ public static partial class MemoryExtensions
         {
             if (options?.EndUserId is { Length: > 0 } userId)
             {
+                options.AddSystemPrompt(SystemPrompt);
                 options.Tools ??= [];
                 var tools = options.Tools;
                 if (!options.Tools.Any(x => x.Name == "memory_read_graph"))
@@ -84,7 +115,7 @@ public static partial class MemoryExtensions
                 return new KnowledgeGraph([], []);
 
             using var stream = File.OpenRead(path);
-            return JsonSerializer.Deserialize(stream, JsonContext.Default.KnowledgeGraph)
+            return JsonSerializer.Deserialize<KnowledgeGraph>(stream, JsonContext.DefaultOptions)
                 ?? new KnowledgeGraph([], []);
         }
 
@@ -93,7 +124,7 @@ public static partial class MemoryExtensions
             string path = GetMemoryPath(userId);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             using var stream = File.Create(path);
-            JsonSerializer.Serialize(stream, graph, JsonContext.Default.KnowledgeGraph);
+            JsonSerializer.Serialize(stream, graph, JsonContext.DefaultOptions);
         }
 
         [Description("Returns the entire knowledge graph for the current user, including all entities and relations.")]

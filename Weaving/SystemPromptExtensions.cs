@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.AI;
 
@@ -8,10 +9,19 @@ public static class SystemPromptExtensions
 {
     extension(ChatOptions options)
     {
-        public string? SystemPrompt
+        public void AddSystemPrompt(string prompt)
         {
-            get => (options.AdditionalProperties ??= []).TryGetValue("SystemPrompt", out var value) ? value as string : null;
-            set => (options.AdditionalProperties ??= [])["SystemPrompt"] = value;
+            if (string.IsNullOrWhiteSpace(prompt))
+                return;
+
+            options.SystemPrompts ??= [];
+            options.SystemPrompts?.Add(prompt);
+        }
+
+        public HashSet<string>? SystemPrompts
+        {
+            get => (options.AdditionalProperties ??= []).TryGetValue("SystemPrompts", out var value) ? value as HashSet<string> : null;
+            set => (options.AdditionalProperties ??= [])["SystemPrompts"] = value;
         }
     }
 
@@ -21,10 +31,13 @@ public static class SystemPromptExtensions
 
         return builder.Use((messages, options, inner, cancellation) =>
         {
-            if (options?.SystemPrompt is { Length: > 0 } prompt &&
-                !messages.Any(x => x.Role == ChatRole.System && x.Text == prompt))
+            if (options?.SystemPrompts is { Count: > 0 } prompts)
             {
-                messages = [new ChatMessage(ChatRole.System, prompt), .. messages];
+                foreach (var prompt in prompts)
+                {
+                    if (!messages.Any(x => x.Role == ChatRole.System && x.Text == prompt))
+                        messages = [new ChatMessage(ChatRole.System, prompt), .. messages];
+                }
             }
             return inner(messages, options, cancellation);
         });

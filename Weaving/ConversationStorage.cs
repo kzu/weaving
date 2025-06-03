@@ -16,19 +16,36 @@ namespace Weaving;
 
 public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount storage, ILogger<ConversationChatClient> logger) : DelegatingChatClient(innerClient)
 {
+    const string SystemPrompt =
+        """
+        # Conversation Storage
+        1. ALWAYS track EVERY topic on EVERY conversation
+        2. Save the conversation identifier and topic(s) using the conversation_ functions. 
+           These are separate from the general purpose knowledge graph memory and are used 
+           specifically for conversations and their identifiers. 
+        3. When user asks about past conversations, use the conversation functions to find by topic and 
+           read the conversation history as needed using the returned conversation identifiers and the 
+           conversation_read_history function.
+        4. Always ensure that conversation identifiers are handled securely and never exposed to users.
+        """;
+
     IDocumentPartition<ChatConversation> history = DocumentPartition.Create<ChatConversation>(
         storage, "Weaving", "Conversations", x => x.Id);
 
     ITableRepository<TableEntity> topics = TableRepository.Create(storage, "Topics");
 
+    bool useConversationTopics = false;
+
     public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         ChatConversation conversation;
+        if (useConversationTopics)
+            (options ??= new ChatOptions()).AddSystemPrompt(SystemPrompt);
 
         if (options?.ConversationId is not { } conversationId)
         {
             conversationId = Ulid.NewUlid().ToString();
-            (options ??= new()).ConversationId = conversationId;
+            (options ??= new ChatOptions()).ConversationId = conversationId;
             logger.LogInformation("Creating new conversation with ID {ConversationId}.", conversationId);
             conversation = new ChatConversation(conversationId, [
                 new ChatMessage(ChatRole.System, $"Conversation ID is {conversationId}"),
@@ -62,11 +79,13 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ChatConversation conversation;
+        if (useConversationTopics)
+            (options ??= new ChatOptions()).AddSystemPrompt(SystemPrompt);
 
         if (options?.ConversationId is not { } conversationId)
         {
             conversationId = Ulid.NewUlid().ToString();
-            (options ??= new()).ConversationId = conversationId;
+            (options ??= new ChatOptions()).ConversationId = conversationId;
             conversation = new ChatConversation(conversationId, [.. messages]);
         }
         else
@@ -98,8 +117,11 @@ public class ConversationChatClient(IChatClient innerClient, CloudStorageAccount
 
     record ChatConversation(string Id, List<ChatMessage> Messages);
 
-    ChatOptions SetupTools(ChatOptions? options)
+    ChatOptions? SetupTools(ChatOptions? options)
     {
+        if (!useConversationTopics)
+            return options;
+
         options ??= new ChatOptions();
         options.Tools ??= [];
         if (!options.Tools.Any(x => x.Name == "conversation_read_history"))
