@@ -43,8 +43,8 @@ public class Interactive : IHostedService
             chatOptions.Tools.Add(AIFunctionFactory.Create(ClearOutput));
 
             // We add it also to the outer/global options so that it can be used in the system prompt
-            if (!chatOptions.Tools.Any(x => x.Name == "get_date"))
-                chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
+            //if (!chatOptions.Tools.Any(x => x.Name == "get_date"))
+            //    chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
 
             return chatOptions;
         });
@@ -68,7 +68,7 @@ public class Interactive : IHostedService
         if (provider == "claude")
             chatOptions.Value.ModelId = "claude-sonnet-4-20250514";
 
-        if (AnsiConsole.Confirm("Do you want to resume the last conversation?"))
+        if (AnsiConsole.Confirm("Do you want to resume the last conversation?", false))
         {
             var table = storage.CreateTableServiceClient().GetTableClient("Weaving");
             var row = table.Query<TableEntity>(x => x.PartitionKey == "Conversations", cancellationToken: cts.Token)

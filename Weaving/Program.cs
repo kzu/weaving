@@ -72,7 +72,8 @@ var builder = host.Services.AddKeyedChatClient("claude", services => new Anthrop
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
     services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
     .UseConversationStorage()
-    .UseMemory()
+    //.UseMemory()
+    .UseGraphMemory()
     .UseSystemPrompt()
     .UseFunctionInvocation();
 
@@ -83,7 +84,8 @@ builder = host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Confi
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
     .GetChatClient("gpt-4.1").AsIChatClient())
     .UseConversationStorage()
-    .UseMemory()
+    //.UseMemory()
+    .UseGraphMemory()
     .UseSystemPrompt()
     .UseFunctionInvocation();
 

@@ -5,7 +5,10 @@ namespace Weaving;
 
 public static class JsonExtensions
 {
-    static readonly JsonSerializerOptions options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+    static readonly JsonSerializerOptions options = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     /// <summary>
     /// Recursively removes 'AdditionalProperties' and truncates long strings in an object before serialization.

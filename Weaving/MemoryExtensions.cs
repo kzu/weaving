@@ -47,15 +47,6 @@ public static partial class MemoryExtensions
 
         """;
 
-    extension(ChatOptions options)
-    {
-        public string? EndUserId
-        {
-            get => (options.AdditionalProperties ??= []).TryGetValue("EndUserId", out var value) ? value as string : null;
-            set => (options.AdditionalProperties ??= [])["EndUserId"] = value;
-        }
-    }
-
     public static ChatClientBuilder UseMemory(this ChatClientBuilder builder)
     {
         _ = Throw.IfNull(builder);

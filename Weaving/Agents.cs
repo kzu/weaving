@@ -50,7 +50,7 @@ public class Scheduler
     }
 }
 
-[Service]
+//[Service]
 [McpServerToolType]
 public class SchedulingAgent : IAgent
 {
@@ -82,12 +82,13 @@ public class SchedulingAgent : IAgent
         });
     }
 
-    public string Id => "scheduling_agent";
+    public string Id => "schedule_task";
 
     public string Capabilities =>
         """
         This agent can perform time-related jobs, such as scheduling prompts to be executed at a future time or after a delay.
         The prompt should contain the instructions on the task to be performed, and the agent will execute it when specified in the prompt.
+        If the prompt does NOT contain specific date or time instructions, it should NOT be called.
         """;
 
     public Task Execute(string prompt) => chat.GetResponseAsync(prompt, options.Value);
