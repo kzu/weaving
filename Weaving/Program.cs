@@ -7,15 +7,19 @@ using System.Text;
 using System.Threading.Tasks;
 using Anthropic;
 using Devlooped;
+using Gremlin.Net.Driver;
+using Gremlin.Net.Structure.IO.GraphSON;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenAI;
 using Polly;
 using Spectre.Console;
 using Weaving;
+using Weaving.Agents;
 
 var host = Host.CreateApplicationBuilder(args);
 
@@ -67,48 +71,81 @@ host.Services.AddScoped(serviceProvider =>
 });
 
 var logging = AnsiConsole.Confirm("Do you want to view detailed logs from the AI?");
+var user = AnsiConsole.Ask("Enter your name", host.Configuration["EndUserId"] ?? Environment.UserName);
+var options = new ChatOptions();
+options.EndUserId = user;
 
-var builder = host.Services.AddKeyedChatClient("claude", services => new AnthropicClient(
+host.Services.AddKeyedChatClient("claude", services => new AnthropicClient(
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
     services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
     .UseConversationStorage()
     //.UseMemory()
-    .UseGraphMemory()
-    .UseSystemPrompt()
-    .UseFunctionInvocation();
+    //.UseGraphMemory()
+    //.UseSystemPrompt()
+    .UseAgents()
+    .UseFunctionInvocation()
+    .UseLogging()
+    .UseConsoleLogging(logging);
 
-if (logging)
-    builder.UseLogging().UseConsoleLogging();
-
-builder = host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
+host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
     ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
     .GetChatClient("gpt-4.1").AsIChatClient())
     .UseConversationStorage()
     //.UseMemory()
-    .UseGraphMemory()
-    .UseSystemPrompt()
-    .UseFunctionInvocation();
+    //.UseGraphMemory()
+    //.UseSystemPrompt()
+    .UseAgents()
+    .UseFunctionInvocation()
+    .UseLogging()
+    .UseConsoleLogging(logging);
 
-if (logging)
-    builder.UseLogging().UseConsoleLogging();
+host.Services.AddKeyedChatClient("scheduler", new OpenAIClient(host.Configuration["OpenAI:Key"]
+    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
+    .GetChatClient("gpt-4.1").AsIChatClient())
+    .UseFunctionInvocation()
+    .UseLogging()
+    .UseConsoleLogging(logging);
 
-host.Services.AddSingleton(services =>
+host.Services.AddKeyedSingleton("scheduler", (_, _) => options);
+
+
+host.Services.AddKeyedChatClient("orders", new OpenAIClient(host.Configuration["OpenAI:Key"]
+    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
+    .GetChatClient("gpt-4.1").AsIChatClient())
+    .UseFunctionInvocation()
+    .UseLogging()
+    .UseConsoleLogging(logging);
+
+host.Services.AddKeyedSingleton("orders", (_, _) => options);
+
+host.Services.AddKeyedChatClient("memory", new OpenAIClient(host.Configuration["OpenAI:Key"]
+    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
+    .GetChatClient("gpt-4.1").AsIChatClient())
+    .UseFunctionInvocation()
+    .UseLogging()
+    .UseConsoleLogging(logging);
+
+host.Services.AddKeyedSingleton("memory", (_, _) => options);
+host.Services.AddSingleton(options);
+
+host.Services.AddOptions<GraphOptions>()
+    .Bind(host.Configuration.GetSection("Graph"));
+
+host.Services.AddSingleton<IGremlinClient>(services =>
 {
-    var agents = services.GetServices<IAgent>();
-    var options = new ChatOptions
-    {
-        Tools =
-        [
-           AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."),
-        ]
-    };
-    foreach (var agent in agents)
-    {
-        // Configures individual agent execution
-        options.Tools.Add(AIFunctionFactory.Create(agent.Execute, agent.Id, agent.Capabilities));
-    }
-    options.AddSystemPrompt(Constants.SystemPrompt);
-    return options;
+    var options = services.GetRequiredService<IOptions<GraphOptions>>().Value;
+    var server = new GremlinServer(options.Host!, 443, enableSsl: true,
+        username: $"/dbs/{options.Database}/colls/{options.Container}",
+        password: options.Key);
+
+    return new GremlinClient(server,
+        new GraphSON2MessageSerializer(),
+        new ConnectionPoolSettings()
+        {
+            MaxInProcessPerConnection = 32,
+            PoolSize = 4,
+        },
+        socket => socket.KeepAliveInterval = TimeSpan.FromSeconds(30));
 });
 
 host.Services.AddLazy();

@@ -12,11 +12,14 @@ namespace Weaving;
 
 public static class ConsoleLoggingExtensions
 {
-    public static ChatClientBuilder UseConsoleLogging(this ChatClientBuilder builder)
+    public static ChatClientBuilder UseConsoleLogging(this ChatClientBuilder builder, bool consoleLogging = true)
     {
         _ = Throw.IfNull(builder);
 
-        return builder.Use((innerClient, services) => new ConsoleLoggingChatClient(innerClient));
+        if (consoleLogging)
+            return builder.Use((innerClient, services) => new ConsoleLoggingChatClient(innerClient));
+
+        return builder;
     }
 
     class ConsoleLoggingChatClient(IChatClient innerClient) : DelegatingChatClient(innerClient)

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -25,6 +26,7 @@ public class Interactive : IHostedService
     readonly CloudStorageAccount storage;
     IChatClient? chat;
     string endUserId;
+    List<ChatMessage> messages = [];
 
     public Interactive(IServiceProvider services, IConfiguration configuration, Lazy<ChatOptions> options, IMessageBus bus, CloudStorageAccount storage)
     {
@@ -42,6 +44,13 @@ public class Interactive : IHostedService
             chatOptions.Tools ??= [];
             chatOptions.Tools.Add(AIFunctionFactory.Create(ClearOutput));
 
+            // Showcases how a function can terminate the function execution loop.
+            chatOptions.Tools.Add(AIFunctionFactory.Create(() =>
+            {
+                AnsiConsole.MarkupLine("[yellow]Stopping execution...[/]");
+                FunctionInvokingChatClient.CurrentContext?.Terminate = true;
+            }, "stop_execution", "Stops the current execution of the agent."));
+
             // We add it also to the outer/global options so that it can be used in the system prompt
             //if (!chatOptions.Tools.Any(x => x.Name == "get_date"))
             //    chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
@@ -54,14 +63,11 @@ public class Interactive : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var user = AnsiConsole.Ask("Enter your name", endUserId);
-        chatOptions.Value.EndUserId = user;
-
         // Prompt user to select LLM provider
         var provider = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Select an LLM provider:")
-                .AddChoices(["claude", "openai"])
+                .AddChoices(["openai", "claude"])
         );
 
         chat = services.GetRequiredKeyedService<IChatClient>(provider);
@@ -135,7 +141,6 @@ public class Interactive : IHostedService
         {
             if (response.Text is { Length: > 0 })
                 AnsiConsole.MarkupLine($":robot: {response.Text}");
-
         }
         catch (Exception e)
         {

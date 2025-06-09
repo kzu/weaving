@@ -1,6 +1,7 @@
 ﻿using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
@@ -9,80 +10,47 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using Weaving;
 
-namespace Weaving;
-
-public interface IAgent
-{
-    string Id { get; }
-    string Capabilities { get; }
-    Task Execute(string prompt);
-}
+namespace Weaving.Agents;
 
 [Service]
-public class Scheduler
-{
-    readonly ConcurrentDictionary<Timer, object?> timers = new();
-
-    public void Schedule(Func<Task> action, TimeSpan delay, bool recurring = false)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        ArgumentOutOfRangeException.ThrowIfLessThan(delay, TimeSpan.Zero);
-
-        Timer? timer = null;
-        timer = new Timer(_ =>
-        {
-            try
-            {
-                action().GetAwaiter().GetResult();
-            }
-            finally
-            {
-                if (!recurring && timer is not null)
-                {
-                    timer.Dispose();
-                    timers.TryRemove(timer, out _);
-                }
-            }
-        }, null, delay, recurring ? delay : Timeout.InfiniteTimeSpan);
-
-        timers.TryAdd(timer, null);
-    }
-}
-
-//[Service]
-[McpServerToolType]
 public class SchedulingAgent : IAgent
 {
     readonly IChatClient chat;
     readonly Scheduler scheduler;
     readonly IMessageBus bus;
     readonly ILogger<IAgent> logger;
-    readonly Lazy<ChatOptions> options;
+    readonly ChatOptions options;
 
-    public SchedulingAgent([FromKeyedServices("openai")] IChatClient chat, Lazy<ChatOptions> options, Scheduler scheduler, IMessageBus bus, ILogger<IAgent> logger)
+    const string SystemPrompt =
+        """
+        You are an agent that performs time-related jobs, such as scheduling prompts to be 
+        executed at a future time or after a delay. 
+        """;
+    static readonly ChatMessage systemMessage = new(ChatRole.System, SystemPrompt);
+
+    public SchedulingAgent(
+        [FromKeyedServices("scheduler")] IChatClient chat,
+        [FromKeyedServices("scheduler")] ChatOptions options,
+        Scheduler scheduler, IMessageBus bus, ILogger<IAgent> logger)
     {
         this.chat = chat;
         this.scheduler = scheduler;
         this.bus = bus;
         this.logger = logger;
 
-        this.options = new Lazy<ChatOptions>(() =>
-        {
-            var cloned = options.Value.Clone();
-            cloned.Tools ??= [];
-            cloned.Tools.AddRange(
-            [
-                AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."),
-                AIFunctionFactory.Create(SchedulePrompt),
-                AIFunctionFactory.Create(ScheduleRelativeTime)
-            ]);
-
-            return cloned;
-        });
+        this.options = options.Clone();
+        options.Tools ??= [];
+        options.Tools.AddRange(
+        [
+            AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."),
+            AIFunctionFactory.Create(SchedulePrompt),
+            AIFunctionFactory.Create(ScheduleRelativeTime)
+        ]);
     }
 
-    public string Id => "schedule_task";
+    public string Name => "schedule_task";
 
     public string Capabilities =>
         """
@@ -91,7 +59,23 @@ public class SchedulingAgent : IAgent
         If the prompt does NOT contain specific date or time instructions, it should NOT be called.
         """;
 
-    public Task Execute(string prompt) => chat.GetResponseAsync(prompt, options.Value);
+    public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellation = default)
+    {
+        var messagesJson = JsonSerializer.Serialize(messages, JsonOptions.Default);
+        var response = await chat.GetResponseAsync(
+            [
+                systemMessage,
+                new ChatMessage(ChatRole.User,
+                $"""
+                Given the following user conversation: 
+                {messagesJson}
+
+                Invoke the relevant tools to schedule a prompt for execution at the relevant time.
+                """)
+            ], options, cancellation);
+
+        return await chat.GetResponseAsync([systemMessage, .. messages], options, cancellation);
+    }
 
     [Description("Schedules execution of a given prompt for some future time.")]
     [McpServerTool]
@@ -103,8 +87,10 @@ public class SchedulingAgent : IAgent
         if (dateTime < DateTimeOffset.Now)
             throw new ArgumentOutOfRangeException(nameof(dateTime), "The date time must be in the future.");
 
-        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync(prompt, options.Value)), dateTime - DateTimeOffset.Now, recurring: false);
+        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync(prompt, options)), dateTime - DateTimeOffset.Now, recurring: false);
         logger.LogInformation("{when} -> {prompt}", dateTime.Humanize(), prompt);
+
+        FunctionInvokingChatClient.CurrentContext?.Terminate = true;
     }
 
     [Description("Schedules execution (optionally recurring) of a given prompt after a delay.")]
@@ -116,7 +102,9 @@ public class SchedulingAgent : IAgent
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
-        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync(prompt, options.Value)), delay, recurring);
+        scheduler.Schedule(async () => bus.Notify(await chat.GetResponseAsync(prompt, options)), delay, recurring);
         logger.LogInformation("{when} -> {prompt}", delay.Humanize(), prompt);
+
+        FunctionInvokingChatClient.CurrentContext?.Terminate = true;
     }
 }
