@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ClientModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
@@ -107,6 +108,20 @@ host.Services.AddKeyedChatClient("scheduler", new OpenAIClient(host.Configuratio
     .UseConsoleLogging(logging);
 
 host.Services.AddKeyedSingleton("scheduler", (_, _) => options);
+
+
+host.Services.AddKeyedChatClient("generic", new OpenAIClient(
+    new ApiKeyCredential(host.Configuration["Grok:Key"] ?? throw new InvalidOperationException("Missing Grok:Key configuration.")),
+    new OpenAIClientOptions
+    {
+        Endpoint = new Uri(host.Configuration["Grok:Endpoint"] ?? "https://api.x.ai/v1"),
+    })
+    .GetChatClient("grok-3-latest").AsIChatClient())
+    .UseFunctionInvocation()
+    .UseLogging()
+    .UseConsoleLogging(logging);
+
+host.Services.AddKeyedSingleton("generic", (_, _) => options);
 
 
 host.Services.AddKeyedChatClient("orders", new OpenAIClient(host.Configuration["OpenAI:Key"]

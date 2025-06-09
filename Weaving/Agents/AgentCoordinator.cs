@@ -65,7 +65,7 @@ public class AgentCoordinator(IChatClient client, IEnumerable<IAgent> agents, IL
         - If tasks must be executed in a specific order due to dependencies, set "depends_on" appropriately. 
         - Make sure to generate unique yet friendly identifiers for each step
         - List them in the correct sequence.
-        - If no agents can handle a task, return an empty plan with no steps.
+        - If no agents can handle a task, return a single step with the generic agent.
         """;
 
     static readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web)
