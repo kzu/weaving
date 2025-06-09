@@ -12,7 +12,7 @@ namespace Weaving.Agents;
 [Service]
 public class GenericAgent([FromKeyedServices("generic")] IChatClient client, Lazy<IEnumerable<IAgent>> agents) : IAgent
 {
-    public string Name => "generic_agent";
+    public string Name => "Generic Agent";
 
     public string Capabilities =>
         """
@@ -20,10 +20,19 @@ public class GenericAgent([FromKeyedServices("generic")] IChatClient client, Laz
         It can handle generic conversation.
         """;
 
+    const string SystemPrompt =
+        """
+        When asked about your capabilities, you should respond with a list of available agents and their capabilities.
+        Always use the same language used by the user (even for agent names and capabilities).
+
+        Available agents are: 
+        {agents}
+        """;
+
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellation = default)
     {
         var system = JsonSerializer.Serialize(agents.Value, JsonOptions.Default);
-        return client.GetResponseAsync([new ChatMessage(ChatRole.System, system), .. messages], new ChatOptions
+        return client.GetResponseAsync([new ChatMessage(ChatRole.System, SystemPrompt.Replace("{agents", system)), .. messages], new ChatOptions
         {
             RawRepresentationFactory = (_) => new GrokCompletionOptions(),
         }, cancellationToken: cancellation);
