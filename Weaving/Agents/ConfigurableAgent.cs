@@ -26,12 +26,12 @@ public abstract class ConfigurableAgent : IAgent
         Throw.IfNullOrEmpty(Name, $"{section}:name must be set in configuration.");
         Throw.IfNullOrEmpty(Description, $"{section}:description must be set in configuration.");
 
-        var client = Throw.IfNullOrEmpty(
+        ClientId = Throw.IfNullOrEmpty(
             configuration[$"{section}:client"],
             $"{section}:client must be set in configuration.");
 
         this.client = new Lazy<IChatClient>(() =>
-            services.GetRequiredKeyedService<IChatClient>(client),
+            services.GetRequiredKeyedService<IChatClient>(ClientId),
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
@@ -44,6 +44,8 @@ public abstract class ConfigurableAgent : IAgent
     public ChatOptions Options { get; } = new();
 
     protected IChatClient Client => client.Value;
+
+    protected string ClientId { get; }
 
     public virtual Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellation = default)
         => Task.FromResult(new ChatResponse());
