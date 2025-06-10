@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Weaving.Agents;
 
@@ -16,20 +15,26 @@ public static class AgentExtensions
 
         return builder.Use((inner, services) =>
         {
-            options ??= services.GetService<ChatOptions>();
-            var agents = services.GetServices<IAgent>();
-            var logger = services.GetRequiredService<ILogger<AgentCoordinator>>();
-            return new AgentCoordinatorChatClient(new AgentCoordinator(inner, agents, logger), inner);
+            var router = services.GetRequiredService<AgentRouter>();
+            return new AgentRouterChatClient(router, inner);
         });
+    }
+
+    class AgentRouterChatClient(AgentRouter router, IChatClient inner) : DelegatingChatClient(inner)
+    {
+        public override Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => router.GetResponseAsync(messages, cancellationToken);
+
+        public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     class AgentCoordinatorChatClient(AgentCoordinator coordinator, IChatClient inner) : DelegatingChatClient(inner)
     {
         public override Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-        {
-            return coordinator.GetResponseAsync(messages, options, cancellationToken);
-        }
+            => coordinator.GetResponseAsync(messages, options, cancellationToken);
 
-        public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 }

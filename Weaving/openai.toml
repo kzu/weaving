@@ -1,0 +1,21 @@
+[openai.default]
+Id = "openai"
+NetworkTimeout = "00:00:30"
+Model = "gpt-4.1"
+
+[openai.grok]
+Endpoint = "https://api.x.ai/v1"
+NetworkTimeout = "00:00:45"
+Model = "grok-3-latest"
+
+[openai.scheduler]
+Model = "gpt-4.1"
+
+[openai.orders]
+Model = "gpt-4.1"
+
+[openai.memory]
+Model = "gpt-4.1"
+
+[openai.router]
+Model = "gpt-4.1-nano"

@@ -30,7 +30,7 @@ public class MemoryUpdatingAgent : GremlinAgent, IAgent
 
     public string Name => "memory_update";
 
-    public string Capabilities =>
+    public string Description =>
         """
         # Knowledge Graph Memory Persistence:
         
@@ -66,7 +66,7 @@ public class MemoryUpdatingAgent : GremlinAgent, IAgent
         var messagesJson = JsonSerializer.Serialize(messages, JsonOptions.Default);
         var response = await chat.GetResponseAsync(
             [
-                new ChatMessage(ChatRole.System, Capabilities),
+                new ChatMessage(ChatRole.System, Description),
                 new ChatMessage(ChatRole.User,
                 $"""
                 Given the following user conversation: 

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
@@ -8,40 +9,17 @@ using Microsoft.Extensions.Logging;
 namespace Weaving.Agents;
 
 [Service]
-public class OrderAgent : IAgent
+public class OrderAgent : ConfigurableAgent
 {
-    readonly IChatClient chat;
-    readonly ChatOptions options;
     readonly ILogger<OrderAgent> logger;
 
-    public string Name => "ordering_agent";
-
-    public string Capabilities =>
-        """
-        You can take orders on behalf of customers, for food, drinks, etc.
-        """;
-
-    const string SystemPrompt =
-        """
-        You need to gather from the user: 
-        - What product(s) they want and what quantity
-        - Who to order from (phone number)
-        
-        If we don't have all the information, ask the user for the missing details.
-        
-        If all the information is provided, preview the order before placing it.
-        """;
-
-    public OrderAgent(
-        [FromKeyedServices("orders")] IChatClient chat,
-        [FromKeyedServices("orders")] ChatOptions options, ILogger<OrderAgent> logger)
+    public OrderAgent(IServiceProvider services, ILogger<OrderAgent> logger)
+        : base(services, "agents:order")
     {
-        this.chat = chat;
         this.logger = logger;
-        this.options = options.Clone();
-        this.options.Tools ??= [];
-        this.options.Tools.Add(AIFunctionFactory.Create(PreviewOrderAsync, "preview_order", "Previews an order for a customer."));
-        this.options.Tools.Add(AIFunctionFactory.Create(PlaceOrderAsync, "place_order", "Places an order for a customer."));
+        this.Options.Tools ??= [];
+        this.Options.Tools.Add(AIFunctionFactory.Create(PreviewOrderAsync, "preview_order", "Previews an order for a customer."));
+        this.Options.Tools.Add(AIFunctionFactory.Create(PlaceOrderAsync, "place_order", "Places an order for a customer."));
         //options.Tools.AddRange(
         //[
         //    AIFunctionFactory.Create(() => "Order placed successfully.", "place_order", "Places an order for a customer."),
@@ -49,10 +27,10 @@ public class OrderAgent : IAgent
         //]);
     }
 
-    public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellation = default)
+    public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellation = default)
     {
-        var response = await chat.GetResponseAsync<MessageAction>([new ChatMessage(ChatRole.System,
-            SystemPrompt), ..messages], options);
+        var response = await Client.GetResponseAsync<MessageAction>([new ChatMessage(ChatRole.System,
+            Prompt), ..messages], Options);
 
         if (response.Result != null)
         {
@@ -74,6 +52,8 @@ public class OrderAgent : IAgent
 
     async Task<MessageAction> PreviewOrderAsync(List<Item> Order, string phoneNumber, CancellationToken cancellation = default)
     {
+        await Task.CompletedTask;
+
         // Simulate placing an order
         foreach (var item in Order)
         {

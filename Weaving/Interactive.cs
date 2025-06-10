@@ -22,47 +22,42 @@ public class Interactive : IHostedService
 
     readonly IServiceProvider services;
     readonly IMessageBus bus;
-    readonly Lazy<ChatOptions> chatOptions;
+    readonly ChatOptions chatOptions;
     readonly CloudStorageAccount storage;
     IChatClient? chat;
-    string endUserId;
     List<ChatMessage> messages = [];
 
-    public Interactive(IServiceProvider services, IConfiguration configuration, Lazy<ChatOptions> options, IMessageBus bus, CloudStorageAccount storage)
+    public Interactive(IServiceProvider services, IConfiguration configuration, IMessageBus bus, CloudStorageAccount storage)
     {
         this.services = services;
         this.bus = bus;
         this.storage = storage;
-        endUserId = configuration["EndUserId"] ?? Environment.UserName;
 
-        chatOptions = new Lazy<ChatOptions>(() =>
+        chatOptions = new()
         {
-            var chatOptions = options.Value.Clone();
+            MaxOutputTokens = 10000,
+            Temperature = 0.7f,
+            Tools = [AIFunctionFactory.Create(ClearOutput)]
+        };
 
-            chatOptions.MaxOutputTokens = 10000;
-            chatOptions.Temperature = 0.7f;
-            chatOptions.Tools ??= [];
-            chatOptions.Tools.Add(AIFunctionFactory.Create(ClearOutput));
+        // Showcases how a function can terminate the function execution loop.
+        chatOptions.Tools.Add(AIFunctionFactory.Create(() =>
+        {
+            AnsiConsole.MarkupLine("[yellow]Stopping execution...[/]");
+            FunctionInvokingChatClient.CurrentContext?.Terminate = true;
+        }, "stop_execution", "Stops the current execution of the agent."));
 
-            // Showcases how a function can terminate the function execution loop.
-            chatOptions.Tools.Add(AIFunctionFactory.Create(() =>
-            {
-                AnsiConsole.MarkupLine("[yellow]Stopping execution...[/]");
-                FunctionInvokingChatClient.CurrentContext?.Terminate = true;
-            }, "stop_execution", "Stops the current execution of the agent."));
-
-            // We add it also to the outer/global options so that it can be used in the system prompt
-            //if (!chatOptions.Tools.Any(x => x.Name == "get_date"))
-            //    chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
-
-            return chatOptions;
-        });
+        // We add it also to the outer/global options so that it can be used in the system prompt
+        //if (!chatOptions.Tools.Any(x => x.Name == "get_date"))
+        //    chatOptions.Tools.Add(AIFunctionFactory.Create(() => DateTimeOffset.Now, "get_date", "Gets the current date time (with offset)."));
 
         bus.Observe<ChatResponse>().Subscribe(AddResponse);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.CompletedTask;
+
         // Prompt user to select LLM provider
         var provider = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
@@ -72,7 +67,7 @@ public class Interactive : IHostedService
 
         chat = services.GetRequiredKeyedService<IChatClient>(provider);
         if (provider == "claude")
-            chatOptions.Value.ModelId = "claude-sonnet-4-20250514";
+            chatOptions.ModelId = "claude-sonnet-4-20250514";
 
         if (AnsiConsole.Confirm("Do you want to resume the last conversation?", false))
         {
@@ -84,7 +79,7 @@ public class Interactive : IHostedService
 
             if (row is not null)
             {
-                chatOptions.Value.ConversationId = row.RowKey;
+                chatOptions.ConversationId = row.RowKey;
                 AnsiConsole.MarkupLine($":robot: Resuming conversation with ID [bold]{row.RowKey}[/]");
             }
             else
@@ -107,7 +102,7 @@ public class Interactive : IHostedService
     void ClearOutput()
     {
         AnsiConsole.Clear();
-        chatOptions.Value.ConversationId = null;
+        chatOptions.ConversationId = null;
         AnsiConsole.MarkupLine($":robot: Cleared :broom:");
     }
 
@@ -122,8 +117,9 @@ public class Interactive : IHostedService
             {
                 try
                 {
+
                     var response = await AnsiConsole.Status().StartAsync(":robot: Thinking...",
-                        ctx => chat!.GetResponseAsync(input, chatOptions.Value, cts.Token));
+                        ctx => chat!.GetResponseAsync(input, chatOptions, cts.Token));
 
                     AddResponse(response);
                 }

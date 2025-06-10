@@ -31,7 +31,7 @@ public class MemoryRetrievalAgent : GremlinAgent, IAgent
 
     public string Name => "memory_retrieval";
 
-    public string Capabilities =>
+    public string Description =>
         """
         # Knowledge Graph Memory Retrieval:
         
@@ -74,7 +74,7 @@ public class MemoryRetrievalAgent : GremlinAgent, IAgent
         var messagesJson = JsonSerializer.Serialize(messages, JsonOptions.Default);
         var response = await chat.GetResponseAsync(
             [
-                new ChatMessage(ChatRole.System, Capabilities),
+                new ChatMessage(ChatRole.System, Description),
                 new ChatMessage(ChatRole.User,
                 $"""
                 Given the following user conversation: 

@@ -1,0 +1,23 @@
+[agents.conversation]
+name = "Conversation Agent"
+
+description = """
+	This is a generic agent to be used only as a fallback when no other more specific agent is available.
+	It can handle generic conversation.
+	"""
+
+prompt = """
+    When asked about your capabilities, you should respond with a list of available agents and their capabilities.
+    Intended display client for these messages is WhatsApp, so keep the responses short and concise, but use 
+    emojis and simple formatting to enhance readability.
+
+    Available agents are: 
+    {agents}
+    """
+
+client = "grok"
+
+[agents.conversation.options]
+maxoutputtokens = 1000
+temperature = 0.7
+modelid = "grok-3-latest"

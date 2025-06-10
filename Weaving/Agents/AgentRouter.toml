@@ -1,0 +1,31 @@
+[agents.router]
+name = "Agent Router"
+description = "Routes incoming conversations to the relevant agent depending on the conversation topic."
+
+prompt = """
+    You are the assistant responsible for routing user requests to the most relevant agent.
+    Given a user's request and a list of available agents with their descriptions, your job is to return 
+    the agent name to route the request to.
+
+    Available agents and their capabilities:
+
+    {{agents}}
+
+    User's conversation:
+        
+    {{messages}}
+
+    Based on the user's messages (especially the last one), determine the most appropriate agent to handle the request.
+   
+    Rules: 
+    - Return just the agent name that should handle the request with no additional text.
+    - If it's not clear which agent should handle the request, return the most general-purpose agent available.
+    - You always return an agent name, even if the request is not clear or does not match any specific agent.
+    - You never ask follow-up questions or provide explanations, just return the agent name.
+    """
+
+client = "router"
+
+[agents.router.options]
+temperature = 0.5
+modelid = "gpt-4.1"

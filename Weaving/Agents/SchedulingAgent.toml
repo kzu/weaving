@@ -1,0 +1,9 @@
+[agents.scheduler]
+name = "Scheduler Agent"
+description = """
+    This agent can perform time-related jobs, such as scheduling prompts to be executed at a future time or after a delay.
+    The prompt should contain the instructions on the task to be performed, and the agent will execute it when specified in the prompt.
+    If the prompt does NOT contain specific date or time instructions, it should NOT be called.
+    """
+prompt = "You are an agent that performs time-related jobs, such as scheduling prompts to be executed at a future time or after a delay."
+client = "scheduler"

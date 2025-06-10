@@ -1,6 +1,6 @@
 ﻿using System;
-using System.ClientModel;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -16,9 +16,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenAI;
 using Polly;
 using Spectre.Console;
+using Tomlyn.Extensions.Configuration;
 using Weaving;
 using Weaving.Agents;
 
@@ -28,6 +28,11 @@ var host = Host.CreateApplicationBuilder(args);
 // This not great, but I couldn't find a better way to do it.
 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
     Console.InputEncoding = Console.OutputEncoding = Encoding.UTF8;
+
+foreach (var toml in Directory.EnumerateFiles(".", "*.toml", SearchOption.AllDirectories))
+{
+    host.Configuration.AddTomlFile(toml, optional: false, reloadOnChange: false);
+}
 
 #if DEBUG
 host.Environment.EnvironmentName = "Development";
@@ -43,7 +48,7 @@ host.Services.AddSingleton(CloudStorageAccount.Parse(
     ?? throw new InvalidOperationException("Missing Storage connection string.")));
 
 // Add HttpClient with resilience pipeline
-host.Services.AddHttpClient("DefaultHttpClient")
+host.Services.AddHttpClient("claude")
     .AddStandardResilienceHandler(options =>
     {
         options.Retry.MaxRetryAttempts = int.MaxValue;
@@ -64,84 +69,21 @@ host.Services.AddHttpClient("DefaultHttpClient")
             TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(30);
     });
 
-// Register HttpClient for DI
-host.Services.AddScoped(serviceProvider =>
-{
-    var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-    return httpClientFactory.CreateClient("DefaultHttpClient");
-});
-
 var logging = AnsiConsole.Confirm("Do you want to view detailed logs from the AI?");
 var user = AnsiConsole.Ask("Enter your name", host.Configuration["EndUserId"] ?? Environment.UserName);
-var options = new ChatOptions();
-options.EndUserId = user;
 
 host.Services.AddKeyedChatClient("claude", services => new AnthropicClient(
     host.Configuration["Claude:Key"] ?? throw new InvalidOperationException("Missing Claude:Key configuration."),
-    services.GetRequiredService<IHttpClientFactory>().CreateClient("DefaultHttpClient")))
-    .UseConversationStorage()
-    //.UseMemory()
-    //.UseGraphMemory()
-    //.UseSystemPrompt()
+    services.GetRequiredService<IHttpClientFactory>().CreateClient("claude")))
     .UseAgents()
-    .UseFunctionInvocation()
-    .UseLogging()
-    .UseConsoleLogging(logging);
+    .UseStandardChat(user, logging);
 
-host.Services.AddKeyedChatClient("openai", new OpenAIClient(host.Configuration["OpenAI:Key"]
-    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
-    .GetChatClient("gpt-4.1").AsIChatClient())
-    .UseConversationStorage()
-    //.UseMemory()
-    //.UseGraphMemory()
-    //.UseSystemPrompt()
-    .UseAgents()
-    .UseFunctionInvocation()
-    .UseLogging()
-    .UseConsoleLogging(logging);
-
-host.Services.AddKeyedChatClient("scheduler", new OpenAIClient(host.Configuration["OpenAI:Key"]
-    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
-    .GetChatClient("gpt-4.1").AsIChatClient())
-    .UseFunctionInvocation()
-    .UseLogging()
-    .UseConsoleLogging(logging);
-
-host.Services.AddKeyedSingleton("scheduler", (_, _) => options);
-
-
-host.Services.AddKeyedChatClient("generic", new OpenAIClient(
-    new ApiKeyCredential(host.Configuration["Grok:Key"] ?? throw new InvalidOperationException("Missing Grok:Key configuration.")),
-    new OpenAIClientOptions
-    {
-        Endpoint = new Uri(host.Configuration["Grok:Endpoint"] ?? "https://api.x.ai/v1"),
-    })
-    .GetChatClient("grok-3-latest").AsIChatClient())
-    .UseFunctionInvocation()
-    .UseLogging()
-    .UseConsoleLogging(logging);
-
-host.Services.AddKeyedSingleton("generic", (_, _) => options);
-
-
-host.Services.AddKeyedChatClient("orders", new OpenAIClient(host.Configuration["OpenAI:Key"]
-    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
-    .GetChatClient("gpt-4.1").AsIChatClient())
-    .UseFunctionInvocation()
-    .UseLogging()
-    .UseConsoleLogging(logging);
-
-host.Services.AddKeyedSingleton("orders", (_, _) => options);
-
-host.Services.AddKeyedChatClient("memory", new OpenAIClient(host.Configuration["OpenAI:Key"]
-    ?? throw new InvalidOperationException("Missing OpenAI:Key configuration."))
-    .GetChatClient("gpt-4.1").AsIChatClient())
-    .UseFunctionInvocation()
-    .UseLogging()
-    .UseConsoleLogging(logging);
-
-host.Services.AddKeyedSingleton("memory", (_, _) => options);
-host.Services.AddSingleton(options);
+// Configures all clients in openai.toml
+host.Services.UseOpenAI(host.Configuration, user, logging, (id, builder) =>
+{
+    if (id == "openai")
+        builder.UseAgents();
+});
 
 host.Services.AddOptions<GraphOptions>()
     .Bind(host.Configuration.GetSection("Graph"));

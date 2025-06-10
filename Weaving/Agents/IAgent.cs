@@ -14,6 +14,6 @@ namespace Weaving.Agents;
 public interface IAgent
 {
     string Name { get; }
-    string Capabilities { get; }
+    string Description { get; }
     Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellation = default);
 }

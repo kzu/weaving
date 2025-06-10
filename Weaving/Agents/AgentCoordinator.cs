@@ -68,20 +68,12 @@ public class AgentCoordinator(IChatClient client, IEnumerable<IAgent> agents, IL
         - If no agents can handle a task, return a single step with the generic agent.
         """;
 
-    static readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault | System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = true,
-    };
-
-    readonly string agentsJson = JsonSerializer.Serialize(agents, jsonOptions);
+    readonly string agentsJson = JsonSerializer.Serialize(agents, JsonOptions.Default);
     readonly IDictionary<string, IAgent> agentsMap = agents.ToDictionary(a => a.Name);
 
     public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellation = default)
     {
-        var messagesJson = JsonSerializer.Serialize(messages, jsonOptions);
+        var messagesJson = JsonSerializer.Serialize(messages, JsonOptions.Default);
         var systemPrompt = SystemPrompt
             .Replace("{{agents}}", agentsJson)
             .Replace("{{messages}}", messagesJson);
@@ -90,7 +82,7 @@ public class AgentCoordinator(IChatClient client, IEnumerable<IAgent> agents, IL
         var planResponse = await client.GetResponseAsync<Plan>(new ChatMessage(ChatRole.User, systemPrompt), options, true, cancellation);
         var plan = planResponse.Result;
 
-        logger.LogTrace("Execution plan: \r{plan}", JsonSerializer.Serialize(plan, jsonOptions));
+        logger.LogTrace("Execution plan: \r{plan}", JsonSerializer.Serialize(plan, JsonOptions.Default));
 
         var stepResults = new Dictionary<string, ChatResponse>();
         var stepTasks = new Dictionary<string, Task<ChatResponse>>();
